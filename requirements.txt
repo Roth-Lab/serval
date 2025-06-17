@@ -1,0 +1,10 @@
+python >=3.7
+dask
+numba
+numpy
+opencv
+pandas
+ray-default
+scikit-image
+scikit-learn
+scipy
