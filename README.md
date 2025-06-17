@@ -49,7 +49,7 @@ If you use Serval Decode in your work, please cite:
 
 ## License
 
-Serval is licensed under the GNU General Public License v3 or later (GPLv3+), see the LICENSE file for details.
+Serval Decode is licensed under the modified Apache License, Version 2.0; see the LICENSE file for details.
 
 
 ```text
