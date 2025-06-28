@@ -120,7 +120,7 @@ def main(config):
     # We added this line on May 22, 2024 since this is what the original Merlin does.
     nn = NearestNeigbourPixelDecoder(
         dataset.codebook,
-        max_dist=0.5176,
+        max_dist=0.5167,
         min_norm=1,
     )
 
@@ -182,11 +182,12 @@ def main(config):
     img_transforms.append(serval.transform.LowPassImageTransform(sigma=0.6))
     
     # Update the decoder for final decoding
-    decoder.decoder = NearestNeigbourPixelDecoder(
-        dataset.codebook,
-        max_dist=0.5167,
-        min_norm=1,
-    )
+    if decoder_type != "cosine":
+        decoder.decoder = NearestNeigbourPixelDecoder(
+            dataset.codebook,
+            max_dist=0.5167,
+            min_norm=1,
+        )
 
     pipeline = DaskDecodingPipeline(decoder, img_transforms)
 
