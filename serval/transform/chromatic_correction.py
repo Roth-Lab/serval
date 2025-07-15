@@ -1,3 +1,9 @@
+"""
+Module for chromatic aberration correction transforms.
+
+Defines ChromaticCorrectionImageTransform to estimate and apply
+per-color spatial shifts based on detected spot offsets.
+"""
 from collections import defaultdict
 
 import itertools
@@ -11,7 +17,24 @@ from serval.transform import ImageTransform
 
 
 class ChromaticCorrectionImageTransform(ImageTransform):
+    """Corrects chromatic shifts between color channels.
+    
+    Attributes:
+        bit_to_color_map (dict): Maps bit index to color ID.
+        min_area (int): Minimum spot area to include when estimating shifts.
+        filter_outliers (bool): Whether to remove outlier offsets.
+        ref_color (int): Reference color ID (anchor channel).
+        img_transforms (dict): Maps color -> SimilarityTransform to apply.
+    """
+
     def __init__(self, bit_to_color_map, min_area=5, filter_outliers=True):
+        """Initialize ChromaticCorrectionImageTransform.
+        
+        Args:
+            bit_to_color_map (dict): bit index -> color ID mapping.
+            min_area (int): Spots smaller than this are ignored. Defaults to 5.
+            filter_outliers (bool): Remove offsets outside the 1–99% quantiles. Defaults to True.
+        """
         self.bit_to_color_map = copy.deepcopy(bit_to_color_map)
 
         self.min_area = min_area
@@ -30,13 +53,27 @@ class ChromaticCorrectionImageTransform(ImageTransform):
 
     @property
     def params(self):
+        """dict: Current per-color SimilarityTransform parameters."""
         return self.img_transforms
 
     @params.setter
     def params(self, x):
+        """Set per-color transform parameters.
+        
+        Args:
+            x (dict): color -> SimilarityTransform mapping.
+        """
         self.img_transforms = x
 
     def get_update_params(self, local_params):
+        """Estimate new transforms from local spot offset measurements.
+        
+        Args:
+            local_params (list of dict): Each dict maps color -> list of offsets.
+        
+        Returns:
+            dict: Updated color -> SimilarityTransform mapping.
+        """
         color_displacements = defaultdict(list)
 
         for x in local_params:
@@ -66,11 +103,31 @@ class ChromaticCorrectionImageTransform(ImageTransform):
         return img_transforms
 
     def get_local_update_params(self, decoded, imgs):
+        """Measure per-spot offsets from decoded result.
+        
+        Args:
+            decoded (PixelDecoderResult): Decoded spots and metrics.
+            imgs (ImageStack): Transformed ImageStack for measuring.
+        
+        Returns:
+            dict: color -> list of [position, offset] pairs.
+        """
         imgs = self.transform(imgs)
 
         return self.get_offsets(decoded, imgs)
 
     def get_offsets(self, decoded, imgs, debug=False):
+        """Compute per-bit positional offsets from decoded spots.
+        
+        Args:
+            decoded (PixelDecoderResult): Contains `decoded.spots` DataFrame.
+            imgs (ImageStack): Transformed ImageStack for measuring.
+            debug (bool): If True, also return raw trace list.
+        
+        Returns:
+            dict: color -> list of [position (np.ndarray), offset (np.ndarray)].
+            If `debug` is True, returns (dict, list of trace dicts).
+        """
         color_displacements = defaultdict(list)
 
         x_size = imgs.imgs.shape[2]
@@ -170,6 +227,17 @@ class ChromaticCorrectionImageTransform(ImageTransform):
             return color_displacements
 
     def _transform(self, img, bit, fov, z):
+        """Apply transform to a single frame via SimilarityTransform.
+        
+        Args:
+            img (np.ndarray): 2D image array.
+            bit (int): Bit index.
+            fov (int): Field-of-view index.
+            z (int): Z-slice index.
+        
+        Returns:
+            np.ndarray: Transformed image.
+        """
         c = self.bit_to_color_map[bit]
         
         #print(f"bit_to_color_map: {self.bit_to_color_map}")
@@ -184,6 +252,14 @@ class ChromaticCorrectionImageTransform(ImageTransform):
             )
 
     def _filter_offsets(self, offsets):
+        """Filter out offsets outside the 1st–99th percentile in x or y.
+        
+        Args:
+            offsets (list): Each item [position, offset].
+        
+        Returns:
+            list: Filtered offsets.
+        """
         keep_idxs = [
             i
             for i, x in enumerate(offsets)
@@ -217,6 +293,16 @@ class ChromaticCorrectionImageTransform(ImageTransform):
 
 
 def is_near_border(coords, sizes, border_size=10):
+    """Determine if a position is within `border_size` pixels of the image border.
+    
+    Args:
+        coords (np.ndarray): (x, y) coordinates.
+        sizes (tuple): (x_size, y_size) image dimensions.
+        border_size (int): Pixel distance from edge. Defaults to 10.
+    
+    Returns:
+        bool: True if near any image border.
+    """
     near_border = False
 
     for i in range(2):
@@ -230,6 +316,16 @@ def is_near_border(coords, sizes, border_size=10):
 
 
 def lsradialcenterfit(m, b, w):
+    """Solve least-squares fit for radial center positions.
+    
+    Args:
+        m (np.ndarray): Slopes array for each pixel.
+        b (np.ndarray): Intercepts array.
+        w (np.ndarray): Weights for each pixel.
+    
+    Returns:
+        tuple: (xc, yc) fitted center coordinates.
+    """
     wm2p1 = w / (m * m + 1)
     sw = np.sum(wm2p1)
     smmw = np.sum(m * m * wm2p1)
@@ -248,6 +344,12 @@ def radial_center(imageIn):
     particle localization.
 
     Adapted from Raghuveer, Nature Methods, 2012
+    
+    Args:
+        imageIn (np.ndarray): 2D image to localize.
+    
+    Returns:
+        tuple: (xc, yc) subpixel center coordinates.
     """
     Ny, Nx = imageIn.shape
     xm_onerow = np.arange(-(Nx - 1) / 2.0 + 0.5, (Nx) / 2.0 - 0.5)
@@ -265,7 +367,6 @@ def radial_center(imageIn):
     fdv = signal.convolve2d(dIdv, h, "same")
     dImag2 = np.multiply(fdu, fdu) + np.multiply(fdv, fdv)
 
-    # TODO: Restructure this code to get rid of the divide by zero warning
     with np.errstate(divide="ignore", invalid="ignore"):
         m = np.divide(-(fdv + fdu), (fdu - fdv + 1e-8))
 
@@ -303,26 +404,20 @@ def radial_center(imageIn):
 
 
 def refine_position(image, x, y, cropSize=4):
+    """Refine object center by cropping and applying radial_center.
+    
+    Args:
+        image (np.ndarray): 2D image array.
+        x (float): Initial x-coordinate.
+        y (float): Initial y-coordinate.
+        cropSize (int): Half-size of the subimage patch. Defaults to 4.
+    
+    Returns:
+        tuple: (xc, yc) refined center coordinates.
+    """
     # Note: This is slightly different than the original MERLIN code which wrapped the indices in int()
     subImage = image[
         round(y) + 2 - cropSize : round(y) + cropSize,
         round(x) + 2 - cropSize : round(x) + cropSize,
     ]
     return radial_center(subImage)
-
-
-# def refine_position(img, x, y, crop_size=4):
-#     x_i = round(x)
-#     y_i = round(y)
-#     try:
-#         x_s = slice(x_i - crop_size, x_i + crop_size + 1)
-#         y_s = slice(y_i - crop_size, y_i + crop_size + 1)
-#         sub_img = img[y_s, x_s]
-#         x_c, y_c = radial_center(sub_img)
-#         x_fit = x_i + x_c - crop_size
-#         y_fit = y_i + y_c - crop_size
-#     # TODO: This is mainly to catch crop size issues but could hide other errors
-#     except ValueError:
-#         x_fit = x
-#         y_fit = y
-#     return x_fit, y_fit

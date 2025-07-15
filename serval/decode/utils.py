@@ -1,8 +1,20 @@
+"""
+Utility functions for image cropping, normalization, reshaping, and histogram-based scaling.
+"""
 import numpy as np
 import skimage.util
 
 
 def crop_image(img, crop_size=0):
+    """Crop each frame in an image stack by a specified number of pixels.
+    
+    Args:
+        img (np.ndarray): Image stack array with shape (frames, height, width).
+        crop_size (int): Number of pixels to remove from each edge. Defaults to 0.
+    
+    Returns:
+        np.ndarray: Cropped image stack with the same number of frames.
+    """
     if crop_size > 0:
         img_new = []
 
@@ -15,6 +27,14 @@ def crop_image(img, crop_size=0):
 
 
 def normalize(x):
+    """Normalize rows of a 2D array to unit length.
+    
+    Args:
+        x (np.ndarray): Input array of shape (n_vectors, vector_length).
+    
+    Returns:
+        np.ndarray: Row-normalized array where each row has Euclidean norm 1.
+    """
     norm = np.linalg.norm(x, axis=1)
 
     norm[norm == 0] = 1
@@ -23,13 +43,28 @@ def normalize(x):
 
 
 def reshape_data(imgs):
+    """Reshape an image stack into a 2D array suitable for vectorized operations.
+    
+    Args:
+        imgs (np.ndarray): Image stack of shape (n_frames, height, width).
+    
+    Returns:
+        np.ndarray: 2D array of shape (height*width, n_frames).
+    """
     return imgs.reshape((imgs.shape[0], np.prod(imgs.shape[1:]))).T
 
 
 def get_init_scaling_factors(hists, q=0.9):
-    """Given pixel intensity histograms computed across each bit compute initial scaling factors
-
-    Basically computes the quantile.
+    """Given pixel intensity histograms computed across each bit, compute initial scaling factors
+    
+    Basically computes the quantile.    
+    
+    Args:
+        hists (np.ndarray): Histogram counts array of shape (n_bits, n_bins).
+        q (float): Quantile to use for scaling factor calculation (0 < q < 1). Defaults to 0.9.
+    
+    Returns:
+        np.ndarray: Array of scaling factors of length n_bits.
     """
     num_bits = hists.shape[0]
 
@@ -47,7 +82,15 @@ def get_init_scaling_factors(hists, q=0.9):
 
 
 def get_imgs_hist(imgs, transforms):
-    """Compute pixel histograms for each round"""
+    """Compute pixel intensity histograms for each frame/imaging round of an image stack after applying transforms.
+    
+    Args:
+        imgs (ImageStack): An ImageStack instance with attributes `imgs` and `num_frames`.
+        transforms (list): List of objects with a `transform` method accepting and returning an ImageStack.
+    
+    Returns:
+        np.ndarray: Array of shape (n_frames, n_bins) containing histograms.
+    """
     for t in transforms:
         imgs = t.transform(imgs)
 
