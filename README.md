@@ -1,7 +1,7 @@
-# Serval Decode
+# Serval
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![GitHub Repo](https://img.shields.io/badge/GitHub-Serval--Decode-blue?logo=github)](https://github.com/Roth-Lab/Serval-Decode)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Serval--Decode-blue?logo=github)](https://github.com/Roth-Lab/serval)
 
 ## Overview
 
@@ -17,7 +17,7 @@
 
 1. Clone the repository  
    ```bash
-   git clone https://github.com/Roth-Lab/Serval-Decode.git
+   git clone https://github.com/Roth-Lab/serval.git
    cd Serval-Decode
    ```
 
@@ -45,7 +45,7 @@ python /examples/standard_run.py \
 
 If you use Serval Decode in your work, please cite:
 
-> Tsui, J. “Serval Decode: A Cosine‐Optimized Pixel Decoder for Spatial Transcriptomics.” *In preparation*, 2025.
+> Tsui, J. “Serval: A Cosine‐Optimized Pixel Decoder for Spatial Transcriptomics.” *In preparation*, 2025.
 
 ## License
 
