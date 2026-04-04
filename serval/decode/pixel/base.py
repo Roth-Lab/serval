@@ -6,6 +6,7 @@ This module provides:
 - PixelDecoderResult: encapsulates decoding outputs and lazily generates spot tables.
 - PixelDecoder: abstract interface defining `predict`, `fit`, and `score` methods.
 """
+
 import numpy as np
 import pandas as pd
 import skimage
@@ -13,9 +14,9 @@ import skimage
 
 class PixelDecoderResult(object):
     """Encapsulates the result of a pixel decoding run.
-    
+
     Spot extraction is performed lazily when accessing the `spots` property.
-    
+
     Attributes:
         codebook (Codebook): The Codebook used for decoding targets.
         dist (np.ndarray): 2D array (height × width) of distances between each pixel’s
@@ -26,9 +27,10 @@ class PixelDecoderResult(object):
         norm (np.ndarray): 2D array (height × width) of normalized intensities for spot scoring.
         info (dict, optional): Additional metadata about the decoding run.
     """
+
     def __init__(self, codebook, dist, idxs, imgs, norm, info=None):
         """Initialize a PixelDecoderResult.
-        
+
         Args:
             codebook (Codebook): Codebook instance providing target names.
             dist (np.ndarray): Array of shape (H, W) with distance values per pixel.
@@ -38,6 +40,8 @@ class PixelDecoderResult(object):
             info (dict, optional): Extra information about the decoding run. Defaults to None.
         """
         self.codebook = codebook
+
+        self.converged = False
 
         self.dist = dist
 
@@ -54,11 +58,11 @@ class PixelDecoderResult(object):
     @property
     def spots(self):
         """pd.DataFrame: Lazy-loaded table of detected spots.
-        
+
         The DataFrame has columns:
         ['barcode_id', 'target', 'mean_intensity', 'max_intensity',
          'area', 'mean_distance', 'min_distance', 'x', 'y']
-        
+
         Returns:
             pd.DataFrame: One row per detected spot region.
         """
@@ -69,7 +73,7 @@ class PixelDecoderResult(object):
 
     def _get_spots_df(self):
         """Build a DataFrame of spot properties from decoded indices.
-        
+
         Returns:
             pd.DataFrame: Spot table with one row per connected region, with columns:
                 - barcode_id (int): Index of the barcode.
@@ -111,30 +115,24 @@ class PixelDecoderResult(object):
 
             all_coords = [list(p.coords) for p in properties]
 
-            intensity_and_coords = [
-                np.array([[y[0], y[1], self.norm[y[0], y[1]]] for y in x])
-                for x in all_coords
-            ]
+            intensity_and_coords = [np.array([[y[0], y[1], self.norm[y[0], y[1]]] for y in x]) for x in all_coords]
 
             # Note: Merlin reports norm weighted centroids
             centroid_coords = np.array(
                 [
-                    [
-                        (r[:, 0] * (r[:, -1] / r[:, -1].sum())).sum(),
-                        (r[:, 1] * (r[:, -1] / r[:, -1].sum())).sum(),
-                    ]
-                    if r.shape[0] > 1
-                    else [r[0][0], r[0][1]]
+                    (
+                        [
+                            (r[:, 0] * (r[:, -1] / r[:, -1].sum())).sum(),
+                            (r[:, 1] * (r[:, -1] / r[:, -1].sum())).sum(),
+                        ]
+                        if r.shape[0] > 1
+                        else [r[0][0], r[0][1]]
+                    )
                     for r in intensity_and_coords
                 ]
             )
 
-            intensity_and_areas = np.array(
-                [
-                    [x[:, 2].mean(), x[:, 2].max(), x.shape[0]]
-                    for x in intensity_and_coords
-                ]
-            )
+            intensity_and_areas = np.array([[x[:, 2].mean(), x[:, 2].max(), x.shape[0]] for x in intensity_and_coords])
 
             centroids = np.zeros((centroid_coords.shape[0], 2))
 
@@ -142,9 +140,7 @@ class PixelDecoderResult(object):
 
             dist = [[self.dist[y[0], y[1]] for y in x] for x in all_coords]
 
-            df_t = pd.DataFrame(
-                np.zeros((len(properties), len(column_names))), columns=column_names
-            )
+            df_t = pd.DataFrame(np.zeros((len(properties), len(column_names))), columns=column_names)
 
             df_t["barcode_id"] = i
 
@@ -152,9 +148,7 @@ class PixelDecoderResult(object):
 
             df_t.loc[:, ["x", "y"]] = centroids[:, [0, 1]]
 
-            df_t.loc[
-                :, ["mean_intensity", "max_intensity", "area"]
-            ] = intensity_and_areas
+            df_t.loc[:, ["mean_intensity", "max_intensity", "area"]] = intensity_and_areas
 
             df_t["area"] = df_t["area"].astype(int)
 
@@ -163,7 +157,7 @@ class PixelDecoderResult(object):
             )
 
             df.append(df_t)
-            
+
         if not df:  # Check if the list is empty
             print("Warning: No valid spots were found in the data.")
             return pd.DataFrame(columns=column_names)  # Return an empty DataFrame
@@ -175,10 +169,10 @@ class PixelDecoderResult(object):
 
 class PixelDecoder(object):
     """Abstract base class for pixel decoding algorithms.
-    
+
     Defines the interface for `predict`, `fit`, and `score` methods.
     Subclasses **must** override `predict`.
-    
+
     Attributes:
         codebook (Codebook): The Codebook used for decoding targets.
     """
@@ -186,13 +180,13 @@ class PixelDecoder(object):
     # Interface
     def predict(self, imgs):
         """Decode an image stack into a PixelDecoderResult.
-        
+
         Args:
             imgs (np.ndarray): Array of shape (B, H, W) for B bit planes.
-        
+
         Returns:
             PixelDecoderResult: Contains decoded indices and spot table.
-        
+
         Raises:
             NotImplementedError: Always, to enforce override in subclass.
         """
@@ -202,7 +196,7 @@ class PixelDecoder(object):
     @property
     def params(self):
         """Returns model parameters after fitting, if supported.
-        
+
         Returns:
             object or None: Fitted parameters, or None if not applicable.
         """
@@ -211,7 +205,7 @@ class PixelDecoder(object):
     @params.setter
     def params(self, x):
         """Set model parameters; override in subclass to customize.
-        
+
         Args:
             x (object): Parameter values to assign.
         """
@@ -219,10 +213,10 @@ class PixelDecoder(object):
 
     def get_update_params(self, local_params):
         """Combine local parameter updates into global parameters.
-        
+
         Args:
             local_params (list): Per-frame parameter objects.
-        
+
         Returns:
             object or None: Combined parameters, or None by default.
         """
@@ -230,10 +224,10 @@ class PixelDecoder(object):
 
     def get_local_update_params(self, imgs):
         """Compute local parameter updates from a single image frame.
-        
+
         Args:
             imgs (np.ndarray): Single-frame data or stack slice.
-        
+
         Returns:
             object or None: Local parameter update (None by default).
         """
@@ -242,10 +236,10 @@ class PixelDecoder(object):
     # Optional override if the method has an objective function
     def score(self, img):
         """Score a single image frame for decoding quality.
-        
+
         Args:
             img (np.ndarray): Single frame of shape (H, W).
-        
+
         Returns:
             float: Quality score (higher is better; default 0.0).
         """
@@ -254,7 +248,7 @@ class PixelDecoder(object):
     # Implementation
     def __init__(self, codebook):
         """Initialize a PixelDecoder.
-        
+
         Args:
             codebook (Codebook): Defines barcode targets and bit mappings.
         """
@@ -262,10 +256,10 @@ class PixelDecoder(object):
 
     def fit(self, imgs):
         """Fit the decoder to data by aggregating local updates.
-        
+
         Args:
             imgs (np.ndarray): Array of frames (B, H, W) to fit on.
-        
+
         Returns:
             None
         """
