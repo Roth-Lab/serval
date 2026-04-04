@@ -4,6 +4,7 @@ Dask-based decoding pipeline module.
 This module provides a parallel, scalable pipeline implementation
 using Dask for lazy evaluation and multiprocessing.
 """
+
 import dask
 import numpy as np
 
@@ -16,8 +17,8 @@ class DaskDecodingPipeline(DecodingPipeline):
 
     This pipeline supports lazy loading and multiprocessing.
     As such it should be scalable to extremely large datasets.
-    
-    
+
+
     Attributes:
         decoder (PixelDecoder): Underlying pixel decoder.
         fit_imgs (list of list of ImageStack, optional): Predefined image sets for each iteration.
@@ -47,9 +48,7 @@ class DaskDecodingPipeline(DecodingPipeline):
             fit_sample_with_replacement (bool): Whether to sample with replacement when selecting images.
             transform_preserve_dtype (bool): If True, preserve dtype of original images after transforms.
         """
-        super().__init__(
-            decoder, img_transforms, transform_preserve_dtype=transform_preserve_dtype
-        )
+        super().__init__(decoder, img_transforms, transform_preserve_dtype=transform_preserve_dtype)
 
         self.fit_imgs = fit_imgs
 
@@ -65,13 +64,16 @@ class DaskDecodingPipeline(DecodingPipeline):
 
     def fit(self, imgs):
         """Fit image transforms and decoder across multiple Dask-delayed iterations.
-        
+
         Args:
             imgs (list of ImageStack): Image stacks to use for fitting.
         """
         fit_imgs = self._get_fit_imgs(imgs)
 
         for i in range(self.fit_num_iters):
+            if self.decoder.converged:
+                break
+
             print("Fit iteration: {}".format(i + 1))
 
             decoded = self.predict(fit_imgs[i])
@@ -84,10 +86,10 @@ class DaskDecodingPipeline(DecodingPipeline):
 
     def predict(self, imgs):
         """Generate Dask-delayed decoding tasks for each image.
-        
+
         Args:
             imgs (list of ImageStack): Image stacks to decode.
-        
+
         Returns:
             list of dask.Delayed: Delayed PixelDecoderResult objects.
         """
@@ -102,10 +104,10 @@ class DaskDecodingPipeline(DecodingPipeline):
 
     def score(self, imgs):
         """Generate Dask-delayed scoring tasks and sum the results.
-        
+
         Args:
             imgs (list of ImageStack): Image stacks to score.
-        
+
         Returns:
             dask.Delayed: Delayed sum of scores.
         """
@@ -120,10 +122,10 @@ class DaskDecodingPipeline(DecodingPipeline):
 
     def transform(self, imgs):
         """Generate Dask-delayed transform tasks for each image.
-        
+
         Args:
             imgs (list of ImageStack): Image stacks to transform.
-        
+
         Returns:
             list of dask.Delayed: Transformed ImageStack objects.
         """
@@ -136,7 +138,7 @@ class DaskDecodingPipeline(DecodingPipeline):
 
     def _fit_decoder(self, imgs):
         """Fit the decoder parameters using Dask-delayed calls.
-        
+
         Args:
             imgs (list of dask.Delayed): Transformed image stacks.
         """
@@ -145,13 +147,11 @@ class DaskDecodingPipeline(DecodingPipeline):
         for x in imgs:
             local_params.append(dask.delayed(self.decoder.get_local_update_params)(x))
 
-        self.decoder.params = dask.delayed(self.decoder.get_update_params)(
-            local_params
-        ).compute()
+        self.decoder.params = dask.delayed(self.decoder.get_update_params)(local_params).compute()
 
     def _fit_image_transforms(self, decoded, imgs):
         """Fit image transforms parameters using decoded results.
-        
+
         Args:
             decoded (list of dask.Delayed): Decoding results.
             imgs (list of ImageStack): Original image stacks.
@@ -189,10 +189,10 @@ class DaskDecodingPipeline(DecodingPipeline):
 
     def _get_fit_imgs(self, imgs):
         """Determine image subsets for each fit iteration.
-        
+
         Args:
             imgs (list of ImageStack): All available image stacks.
-        
+
         Returns:
             list of list of ImageStack: Lists of images per iteration.
         """
@@ -226,7 +226,7 @@ class DaskDecodingPipeline(DecodingPipeline):
 
         This is a helper to support _fit_image_transforms.
         It uses the fact that we only need to consider param updates up to the last transform that supports them.
-        
+
         Returns:
             list of ImageTransform: Transforms with non-None `params`.
         """
