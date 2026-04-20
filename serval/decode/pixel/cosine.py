@@ -196,22 +196,20 @@ class CosineOptimizedPixelDecoder(PixelDecoder):
         """
 
         def f(x, y, z):
-            # return -1 * obj_func(x, y, z) + self.penalty_entropy * np.sum((x - 1) ** 2)
             x_bar = x / np.sum(x)
             return (
                 -1 * obj_func(x, y, z)
-                + self.penalty_entropy * np.sum(x_bar * np.log(x_bar))
-                + self.penalty_l2 * np.sum((x - 1) ** 2)
+                + self.penalty_entropy * N * np.sum(x_bar * np.log(x_bar))
+                + self.penalty_l2 * N * np.sum((x - 1) ** 2)
             )
 
         def g(x, y, z):
-            # return -1 * grad_obj_func(x, y, z) + 2 * self.penalty_entropy * (x - 1)
             x_nrm = np.sum(x)
             x_bar = x / x_nrm
             return (
                 -1 * grad_obj_func(x, y, z)
-                + self.penalty_entropy * (np.log(x_bar) + 1) * (np.sum(x_bar) - x_bar) / x_nrm
-                + 2 * self.penalty_l2 * (x - 1)
+                + self.penalty_entropy * N * (np.log(x_bar) + 1) * (np.sum(x_bar) - x_bar) / x_nrm
+                + 2 * self.penalty_l2 * N * (x - 1)
             )
 
         X = [[] for _ in range(self.codebook.num_targets)]
@@ -221,6 +219,8 @@ class CosineOptimizedPixelDecoder(PixelDecoder):
                 X[i].extend(x[i])
 
         X = [np.stack(x, axis=1) if len(x) > 0 else [] for x in X]
+
+        N = sum([len(x) for x in X])
 
         r = scipy.optimize.minimize(
             f,
@@ -259,7 +259,7 @@ class CosineOptimizedPixelDecoder(PixelDecoder):
             coords = random.sample(coords, self.fit_max_size)
 
         result = [[] for _ in range(self.codebook.num_targets)]
-        
+
         imgs = self._get_pre_scaled_imgs(imgs)
 
         for b, x, y in coords:

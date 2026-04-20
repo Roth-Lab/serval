@@ -61,6 +61,8 @@ class DeconvoleImageTransform(ImageTransform):
 def lucy_richardson_deconvolve(img, num_iters=20, sigma=2.0, window_size=None):
     """Perform Lucy-Richardson deconvolution.
     
+    Ported from https://github.com/emanuega/MERlin/blob/master/merlin/util/deconvolve.py which was ported from Matlab deconvlucy.
+    
     Args:
         img (np.ndarray): 2D float image to deconvolve.
         num_iters (int): Number of iterations. Defaults to 20.
@@ -131,6 +133,8 @@ def lucy_richardson_deconvolve(img, num_iters=20, sigma=2.0, window_size=None):
 
 def gaussian_2d(shape=(3, 3), sigma=0.5):
     """Generate a 2D Gaussian kernel.
+    
+    Ported from https://github.com/emanuega/MERlin/blob/master/merlin/util/matlab.py
     
     Args:
         shape (tuple of int): Kernel shape (height, width).

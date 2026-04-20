@@ -41,8 +41,6 @@ class PixelDecoderResult(object):
         """
         self.codebook = codebook
 
-        self.converged = False
-
         self.dist = dist
 
         self.idxs = idxs
@@ -253,6 +251,8 @@ class PixelDecoder(object):
             codebook (Codebook): Defines barcode targets and bit mappings.
         """
         self.codebook = codebook
+
+        self.converged = False
 
     def fit(self, imgs):
         """Fit the decoder to data by aggregating local updates.
