@@ -9,10 +9,5 @@ setup(
     url="https://github.com/Roth-Lab/serval",
     packages=find_packages(),
     license="GPL v3",
-    install_requires=[
-        "numpy",
-        "pandas",
-        "scikit-image",
-        "scipy"
-    ]
+    install_requires=["numpy", "pandas", "scikit-image", "scipy"],
 )

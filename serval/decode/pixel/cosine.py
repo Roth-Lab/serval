@@ -74,23 +74,24 @@ class CosineOptimizedPixelDecoder(PixelDecoder):
 
     Attributes:
         decoder (PixelDecoder): Underlying decoder used after scaling.
-        scaling_factors (np.ndarray): Current per-bit scaling factors.
-        penalty_entropy (float): Regularization strength on scaling factors.
-        fit_max_size (int or None): Max number of pixel locations to sample when fitting.
-        fit_max_area (int): Max spot area (in pixels) to include when sampling.
-        fit_min_area (int): Min spot area (in pixels) to include when sampling.
+        max_size (int or None): Max number of pixel locations to sample when fitting.
+        max_area (int): Max spot area (in pixels) to include when sampling.
+        min_area (int): Min spot area (in pixels) to include when sampling.
         norm_barcodes (np.ndarray): Array of shape (n_barcodes, n_bits) where each row of the
             barcode matrix B has been L2‐normalized.
+        penalty_entropy (float): Regularization strength on scaling factors.
+        scaling_factors (np.ndarray): Current per-bit scaling factors.
+
     """
 
     def __init__(
         self,
         codebook,
         decoder,
-        fit_max_size=None,
-        fit_max_area=12,
-        fit_min_area=3,
         init_scaling_factors=None,
+        max_area=12,
+        max_size=None,
+        min_area=3,
         penalty_entropy=0,
         penalty_l2=0,
         pre_scaling_factors=None,
@@ -100,21 +101,22 @@ class CosineOptimizedPixelDecoder(PixelDecoder):
         Args:
             codebook (Codebook): Codebook instance providing target names.
             decoder (PixelDecoder): Underlying decoder to refine.
-            fit_max_size (int, optional): Max sample size for fitting. Defaults to None.
-            fit_max_area (int): Max spot area for sampling. Defaults to 12.
-            fit_min_area (int): Min spot area for sampling. Defaults to 3.
+            max_size (int, optional): Max sample size for fitting. Defaults to None.
+            max_area (int): Max spot area for sampling. Defaults to 12.
+            min_area (int): Min spot area for sampling. Defaults to 3.
             init_scaling_factors (np.ndarray, optional): Initial scaling factors array. Defaults to ones.
             penalty_entropy (float): Regularization strength. Defaults to 0.0.
+            pre_scaling_factors (nd.array, optional): Fixed scaling factors to pre-scale images before anay analysis.
         """
         super().__init__(codebook)
 
         self.decoder = decoder
 
-        self.fit_max_size = fit_max_size
+        self.max_size = max_size
 
-        self.fit_max_area = fit_max_area
+        self.max_area = max_area
 
-        self.fit_min_area = fit_min_area
+        self.min_area = min_area
 
         if init_scaling_factors is None:
             init_scaling_factors = np.ones(codebook.num_bits)
@@ -249,14 +251,14 @@ class CosineOptimizedPixelDecoder(PixelDecoder):
             barcode_regions = [
                 x
                 for x in skimage.measure.regionprops(skimage.measure.label((decoded.idxs == b).astype(int)))
-                if (self.fit_min_area <= x.area <= self.fit_max_area)
+                if (self.min_area <= x.area <= self.max_area)
             ]
 
             for br in barcode_regions:
                 coords.extend([(b, x, y) for x, y in br.coords])
 
-        if (self.fit_max_size is not None) and (len(coords) > self.fit_max_size):
-            coords = random.sample(coords, self.fit_max_size)
+        if (self.max_size is not None) and (len(coords) > self.max_size):
+            coords = random.sample(coords, self.max_size)
 
         result = [[] for _ in range(self.codebook.num_targets)]
 

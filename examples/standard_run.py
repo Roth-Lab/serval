@@ -1,14 +1,19 @@
+from datetime import datetime
+
+import argparse
+import json
+import os
 import pathlib
 import pickle
-import json
-import dask
 import sys
 
-dask.config.set({"dataframe.query-planning": True})
+from ray.util.dask import enable_dask_on_ray
 
+
+import dask
 import dask.dataframe as dd
 import numpy as np
-
+import ray
 
 from serval.decode.pixel import (
     CosineOptimizedPixelDecoder,
@@ -22,12 +27,7 @@ from serval.pipeline import DaskDecodingPipeline
 import serval.io.merlin
 import serval.transform
 
-import os
-from datetime import datetime
-import ray
-import argparse
-
-from ray.util.dask import enable_dask_on_ray
+dask.config.set({"dataframe.query-planning": True})
 
 
 def load_config(config_file):
@@ -52,14 +52,10 @@ def main(config):
     fit_imgs_per_iter = config["fit_imgs_per_iter"]
 
     if not use_merlin_opt_tiles:
-        print(
-            "Warning: To compare decoding method with Merlin, it is suggested to use Merlin Optimization Tiles."
-        )
+        print("Warning: To compare decoding method with Merlin, it is suggested to use Merlin Optimization Tiles.")
 
     if decoder_type == "scaled" and filter_outliers:
-        print(
-            "Error: Serval Merlin (scaled decoder) requires filter outliers set to False."
-        )
+        print("Error: Serval Merlin (scaled decoder) requires filter outliers set to False.")
         sys.exit(1)
 
     if decoder_type == "cosine" and not filter_outliers:
@@ -106,16 +102,12 @@ def main(config):
             chromatic_corrector=chromatic_corrector_option,
         ),
         serval.transform.HighPassImageTransform(sigma=2),
-        serval.transform.DeconvoleImageTransform(
-            filter_size=9, num_iters=10, sigma=1.2
-        ),
+        serval.transform.DeconvoleImageTransform(filter_size=9, num_iters=10, sigma=1.2),
         serval.transform.LowPassImageTransform(sigma=1.0),
     ]
 
     # Load initial scaling factors
-    init_scaling_factors = load_init_scaling_factors(
-        spot_imgs, img_transforms, results_dir
-    )
+    init_scaling_factors = load_init_scaling_factors(spot_imgs, img_transforms, results_dir)
 
     # We added this line on May 22, 2024 since this is what the original Merlin does.
     nn = NearestNeigbourPixelDecoder(
@@ -140,8 +132,7 @@ def main(config):
                 nn,
                 fit_max_size=int(1e5),
                 fit_min_area=5,
-                init_scaling_factors=init_scaling_factors
-                / np.mean(init_scaling_factors),
+                init_scaling_factors=init_scaling_factors / np.mean(init_scaling_factors),
                 penalty=int(cosine_penalty),
             )
 
@@ -160,9 +151,7 @@ def main(config):
     else:
         fit_imgs = None
 
-    pipeline = DaskDecodingPipeline(
-        decoder, img_transforms, fit_imgs=fit_imgs, fit_imgs_per_iter=fit_imgs_per_iter
-    )
+    pipeline = DaskDecodingPipeline(decoder, img_transforms, fit_imgs=fit_imgs, fit_imgs_per_iter=fit_imgs_per_iter)
 
     if decoder_type != "simple":
         dask.compute(pipeline.fit(list(spot_imgs.values())))
@@ -180,7 +169,7 @@ def main(config):
     img_transforms.pop()
 
     img_transforms.append(serval.transform.LowPassImageTransform(sigma=0.6))
-    
+
     # Update the decoder for final decoding
     if decoder_type != "cosine":
         decoder.decoder = NearestNeigbourPixelDecoder(
@@ -195,9 +184,7 @@ def main(config):
     # Finally decode and save results
     spots_df = []
 
-    for (fov, z), result in zip(
-        spot_imgs.keys(), pipeline.predict(list(spot_imgs.values()))
-    ):
+    for (fov, z), result in zip(spot_imgs.keys(), pipeline.predict(list(spot_imgs.values()))):
         s = result.spots
 
         s = s.assign(fov=fov, z=z)
@@ -255,11 +242,7 @@ def load_fiducial_transforms(imgs, results_dir):
         return cache_dir.joinpath("fov_{}.npy".format(fov))
 
     def compute_and_save_fiducial_transform(img, out_file):
-        fiducial_transform = (
-            serval.transform.FiducialAlignmentImageTransform.get_fiducial_transforms(
-                img, sigma=3
-            )
-        )
+        fiducial_transform = serval.transform.FiducialAlignmentImageTransform.get_fiducial_transforms(img, sigma=3)
 
         np.save(out_file, fiducial_transform)
 
@@ -271,11 +254,7 @@ def load_fiducial_transforms(imgs, results_dir):
 
     for fov in imgs:
         if not get_cache_file(fov).exists():
-            imgs_to_process.append(
-                dask.delayed(compute_and_save_fiducial_transform)(
-                    imgs[fov], get_cache_file(fov)
-                )
-            )
+            imgs_to_process.append(dask.delayed(compute_and_save_fiducial_transform)(imgs[fov], get_cache_file(fov)))
 
     dask.compute(imgs_to_process)
 
@@ -309,11 +288,7 @@ def load_init_scaling_factors(imgs, img_transforms, results_dir):
 
     for fov, z in imgs:
         if not get_cache_file(fov, z).exists():
-            imgs_to_process.append(
-                dask.delayed(compute_and_save_histograms)(
-                    imgs[(fov, z)], get_cache_file(fov, z)
-                )
-            )
+            imgs_to_process.append(dask.delayed(compute_and_save_histograms)(imgs[(fov, z)], get_cache_file(fov, z)))
 
     dask.compute(imgs_to_process)
 
@@ -332,9 +307,7 @@ def load_merlin_fit_images(imgs, merlin_results_dir):
         return len(list(merlin_results_dir.glob("Optimize*")))
 
     def get_num_tiles_per_iter():
-        return len(
-            list(merlin_results_dir.joinpath("Optimize1").glob("select_frame_*.npy"))
-        )
+        return len(list(merlin_results_dir.joinpath("Optimize1").glob("select_frame_*.npy")))
 
     num_iters = get_num_iters()
 
@@ -346,9 +319,7 @@ def load_merlin_fit_images(imgs, merlin_results_dir):
         round_imgs = []
 
         for j in range(num_tiles_per_iter):
-            file_name = merlin_results_dir.joinpath(
-                "Optimize{}".format(i + 1), "select_frame_{}.npy".format(j)
-            )
+            file_name = merlin_results_dir.joinpath("Optimize{}".format(i + 1), "select_frame_{}.npy".format(j))
 
             fov, z = np.load(file_name)
 
@@ -366,12 +337,8 @@ def execute_with_ray(config, default_cpus=100, default_mem=250):
     timestamp = datetime.now().strftime("%S%H%M%S")
 
     # temporary directory path
-    temp_dir = os.path.normpath(
-        os.path.join("/output_dir", timestamp, "ray")
-    )
-    object_spilling_dir = os.path.normpath(
-        os.path.join("/output_dir", timestamp, "ray_objspill")
-    )
+    temp_dir = os.path.normpath(os.path.join("/output_dir", timestamp, "ray"))
+    object_spilling_dir = os.path.normpath(os.path.join("/output_dir", timestamp, "ray_objspill"))
 
     # Request 8 cores and 128GB of memory
     ray.init(
@@ -399,12 +366,8 @@ def execute_with_ray(config, default_cpus=100, default_mem=250):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Run the main script with a configuration file."
-    )
-    parser.add_argument(
-        "config_file", type=str, help="Path to the JSON configuration file."
-    )
+    parser = argparse.ArgumentParser(description="Run the main script with a configuration file.")
+    parser.add_argument("config_file", type=str, help="Path to the JSON configuration file.")
     args = parser.parse_args()
 
     config = load_config(args.config_file)

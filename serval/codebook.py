@@ -26,7 +26,7 @@ class Codebook(object):
             add_background (bool): If True, append a zero vector labeled 'background'.
             blank_prefix (str, optional): If provided, drop any targets whose
                 names start with this prefix.
-        
+
         Returns:
             Codebook: A new instance containing the loaded (and possibly
                 filtered/augmented) barcode DataFrame.
@@ -81,7 +81,7 @@ class Codebook(object):
 
         Args:
             target (str): The target name whose barcode to fetch.
-        
+
         Returns:
             pd.Series: The bit vector (row) for the requested target.
         """
@@ -92,7 +92,7 @@ class Codebook(object):
 
         Args:
             bit_index (int): Zero‑based index into the barcode vector.
-        
+
         Returns:
             str: The name of the readout corresponding to that bit.
         """
@@ -100,10 +100,10 @@ class Codebook(object):
 
     def get_target_id(self, target):
         """Convert a target name to its integer index.
-        
+
         Args:
             target (str): The target name to look up.
-        
+
         Returns:
             int: The zero‑based row index of the target in the DataFrame.
         """

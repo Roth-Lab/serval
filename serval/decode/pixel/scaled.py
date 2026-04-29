@@ -26,18 +26,21 @@ class ScaledImagePixelDecoder(PixelDecoder):
         min_area (int): Minimum pixel area for including in scaling estimation.
     """
 
-    def __init__(self, codebook, decoder, init_scaling_factors=None, min_area=3):
+    def __init__(self, codebook, decoder, init_scaling_factors=None, max_area=12, min_area=3):
         """Initialize a ScaledImagePixelDecoder.
 
         Args:
             codebook (Codebook): Codebook for decoding.
             decoder (PixelDecoder): Underlying decoder to use.
             init_scaling_factors (np.ndarray, optional): Initial scaling factors array. Defaults to ones.
+            max_area (int): Max spot area (in pixels) to include when sampling.
             min_area (int): Minimum pixel area to consider for regions. Defaults to 3.
         """
         super().__init__(codebook)
 
         self.decoder = decoder
+
+        self.max_area = max_area
 
         self.min_area = min_area
 
@@ -151,7 +154,7 @@ class ScaledImagePixelDecoder(PixelDecoder):
             barcode_regions = [
                 x
                 for x in skimage.measure.regionprops(skimage.measure.label((decoded_pixels == b).astype(int)))
-                if x.area >= self.min_area
+                if (self.min_area <= x.area <= self.max_area)
             ]
 
             barcodes_seen[b] = len(barcode_regions)

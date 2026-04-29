@@ -4,6 +4,7 @@ Module for low-pass filtering of image frames.
 This module provides:
 - LowPassImageTransform: ImageTransform that applies a Gaussian blur.
 """
+
 import cv2
 import numpy as np
 
@@ -12,14 +13,15 @@ from serval.transform import ImageTransform
 
 class LowPassImageTransform(ImageTransform):
     """ImageTransform that applies a low-pass (Gaussian) filter to each frame.
-    
+
     Attributes:
         sigma (float): Standard deviation for Gaussian blur.
         filter_size (int): Size of the Gaussian kernel calculated from sigma.
     """
+
     def __init__(self, sigma=1):
         """Initialize LowPassImageTransform.
-        
+
         Args:
             sigma (float): Gaussian blur standard deviation. Defaults to 1.0.
         """
@@ -29,13 +31,13 @@ class LowPassImageTransform(ImageTransform):
 
     def _transform(self, img, bit, fov, z):
         """Apply low-pass filter to a single frame.
-        
+
         Args:
             img (np.ndarray): 2D image array.
             bit (int): Bit index (unused).
             fov (int): Field-of-view index (unused).
             z (int): Z-slice index (unused).
-        
+
         Returns:
             np.ndarray: Low-pass filtered image.
         """
@@ -44,12 +46,12 @@ class LowPassImageTransform(ImageTransform):
 
 def low_pass_filter(img, sigma, window_size):
     """Apply Gaussian low-pass filter to the image.
-    
+
     Args:
         img (np.ndarray): 2D input image.
         sigma (float): Gaussian blur standard deviation.
         window_size (int): Size of the Gaussian kernel (must be odd).
-    
+
     Returns:
         np.ndarray: Blurred image.
     """

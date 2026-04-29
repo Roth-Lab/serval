@@ -6,6 +6,7 @@ This module provides:
 - lucy_richardson_deconvolve: Core deconvolution function.
 - gaussian_2d: Utility to generate a 2D Gaussian kernel.
 """
+
 import cv2
 import numpy as np
 import scipy.ndimage
@@ -15,15 +16,16 @@ from serval.transform import ImageTransform
 
 class DeconvoleImageTransform(ImageTransform):
     """ImageTransform that applies Lucy-Richardson deconvolution to each frame.
-    
+
     Attributes:
         filter_size (int, optional): Size of the deconvolution kernel. Defaults based on sigma.
         num_iters (int): Number of Richardson-Lucy iterations. Defaults to 20.
         sigma (float): Standard deviation for Gaussian PSF. Defaults to 1.0.
     """
+
     def __init__(self, filter_size=None, num_iters=20, sigma=1):
         """Initialize DeconvoleImageTransform.
-        
+
         Args:
             filter_size (int, optional): Kernel size; if None, computed from sigma.
             num_iters (int): Number of deconvolution iterations. Defaults to 20.
@@ -40,13 +42,13 @@ class DeconvoleImageTransform(ImageTransform):
 
     def _transform(self, img, bit, fov, z):
         """Apply Lucy-Richardson deconvolution to a single frame.
-        
+
         Args:
             img (np.ndarray): 2D image array, will be cast to float internally.
             bit (int): Bit index (unused).
             fov (int): Field-of-view index (unused).
             z (int): Z-slice index (unused).
-        
+
         Returns:
             np.ndarray: Deconvolved image after num_iters iterations.
         """
@@ -60,15 +62,15 @@ class DeconvoleImageTransform(ImageTransform):
 
 def lucy_richardson_deconvolve(img, num_iters=20, sigma=2.0, window_size=None):
     """Perform Lucy-Richardson deconvolution.
-    
+
     Ported from https://github.com/emanuega/MERlin/blob/master/merlin/util/deconvolve.py which was ported from Matlab deconvlucy.
-    
+
     Args:
         img (np.ndarray): 2D float image to deconvolve.
         num_iters (int): Number of iterations. Defaults to 20.
         sigma (float): Standard deviation for Gaussian PSF. Defaults to 2.0.
         window_size (int, optional): Kernel size; if None, computed from sigma.
-    
+
     Returns:
         np.ndarray: Deconvolved image after specified iterations.
     """
@@ -133,13 +135,13 @@ def lucy_richardson_deconvolve(img, num_iters=20, sigma=2.0, window_size=None):
 
 def gaussian_2d(shape=(3, 3), sigma=0.5):
     """Generate a 2D Gaussian kernel.
-    
+
     Ported from https://github.com/emanuega/MERlin/blob/master/merlin/util/matlab.py
-    
+
     Args:
         shape (tuple of int): Kernel shape (height, width).
         sigma (float): Standard deviation of the Gaussian. Defaults to 0.5.
-    
+
     Returns:
         np.ndarray: Normalized 2D Gaussian kernel array.
     """

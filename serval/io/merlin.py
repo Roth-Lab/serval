@@ -1,6 +1,7 @@
 """
 Module for organizing MERlin image datasets and loading image stacks.
 """
+
 import pathlib
 import re
 
@@ -13,10 +14,10 @@ from serval.codebook import Codebook
 
 def _parse_str_to_list(frame_str):
     """Parse a string representation of a list of frame indices into a Python list.
-    
+
     Args:
         frame_str (str): A string like "[0 1 2]" or "[3 4]".
-    
+
     Returns:
         list of str: The list of frame tokens extracted from the string.
     """
@@ -32,17 +33,18 @@ def _parse_str_to_list(frame_str):
 
 class MerlinDataOrganisation(object):
     """Load and organize MERlin dataset metadata for image file lookup.
-    
+
     This class reads a CSV describing bit-to-round mappings and image frames,
     then indexes on field-of-view (FOV) and imaging round to locate files
     and specific frames.
-    
+
     Attributes:
         img_dir (Path): Directory containing raw image files.
         flip_horizontal (bool): Whether to flip images horizontally.
         flip_vertical (bool): Whether to flip images vertically.
         transpose (bool): Whether to transpose images.
     """
+
     def __init__(
         self,
         codebook,
@@ -112,11 +114,11 @@ class MerlinDataOrganisation(object):
     def get_fiducial_img(self, fov, img_round):
         """
         Load the fiducial image for a given FOV and zero-based imaging round.
-        
+
         Args:
             fov (int): Field-of-view index.
             img_round (int): Zero-based imaging round index.
-        
+
         Returns:
             np.ndarray: The image frame for the fiducial channel.
         """
@@ -127,12 +129,12 @@ class MerlinDataOrganisation(object):
     def get_primary_img(self, bit, fov, z):
         """
         Load a primary image for a given zero-bsaed bit, FOV, and z-slice.
-        
+
         Args:
             bit (int): Zero-based bit index.
             fov (int): Field-of-view index.
             z (int): Zero-based z-slice index.
-        
+
         Returns:
             np.ndarray: The image frame for the specified bit and z.
         """
@@ -155,10 +157,7 @@ class MerlinDataOrganisation(object):
     def _get_fiducial_frame(self, img_round):
         """Get fiducial frame for zero based img_round"""
         return (
-            self.df[["img_idx", "fiducialFrame"]]
-            .drop_duplicates()
-            .set_index("img_idx")
-            .loc[img_round, "fiducialFrame"]
+            self.df[["img_idx", "fiducialFrame"]].drop_duplicates().set_index("img_idx").loc[img_round, "fiducialFrame"]
         )
 
     def _get_primary_frame(self, color, img_round, z):
@@ -179,7 +178,7 @@ class MerlinDataOrganisation(object):
         df = df.loc[codebook.readout_names]
         df = df.reset_index()
         df = df.rename(columns={"index": "readoutName"})
-        
+
         # Validate the bitNumbers are unique
         assert df["bitNumber"].nunique() == df.shape[0]
 
@@ -187,11 +186,7 @@ class MerlinDataOrganisation(object):
         df["bit_idx"] = df.index
 
         # Map imaging rounds to zero index contiguous
-        self._img_round_map = dict(
-            zip(
-                sorted(df["imagingRound"].unique()), range(df["imagingRound"].nunique())
-            )
-        )
+        self._img_round_map = dict(zip(sorted(df["imagingRound"].unique()), range(df["imagingRound"].nunique())))
 
         df["img_idx"] = df["imagingRound"].map(self._img_round_map)
 
@@ -232,11 +227,11 @@ class MerlinDataOrganisation(object):
     def _load_image(self, file_name, frame):
         """
         Read and optionally transpose/flip an image frame from disk.
-        
+
         Args:
             file_name (Path): Path to the image file.
             frame (int): Frame index to load via skimage.
-        
+
         Returns:
             np.ndarray: The loaded (and transformed) image.
         """
@@ -257,14 +252,15 @@ class MerlinDataOrganisation(object):
 class MerlinDataset(object):
     """
     High-level interface to load MERlin codebook and image stacks.
-    
+
     This wraps Codebook parsing and MerlinDataOrganisation to provide easy
     access to fiducial and primary image stacks.
-    
+
     Attributes:
         codebook (Codebook): Parsed codebook instance.
         data_org (MerlinDataOrganisation): Metadata & image-path organizer.
     """
+
     def __init__(
         self,
         codebook_file,
@@ -276,7 +272,7 @@ class MerlinDataset(object):
     ):
         """
         Initialize a MerlinDataset instance.
-        
+
         Args:
             codebook_file (str): Path to the codebook CSV.
             data_org_file (str): Path to the data organization CSV.
@@ -299,11 +295,11 @@ class MerlinDataset(object):
     def get_fiducial_image_stack(self, fov, crop_size=0):
         """
         Load a stack of fiducial images across all rounds for a given FOV.
-        
+
         Args:
             fov (int): Field-of-view index.
             crop_size (int): Number of pixels to crop from each edge. Defaults to 0.
-        
+
         Returns:
             np.ndarray: Array of shape (rounds, height, width).
         """
@@ -322,12 +318,12 @@ class MerlinDataset(object):
     def get_primary_image_stack(self, fov, z, crop_size=0):
         """
         Load a stack of primary images for all bits at a given FOV and z-slice.
-        
+
         Args:
             fov (int): Field-of-view index.
             z (int): Zero-based z-slice index.
             crop_size (int): Pixels to crop from each edge. Defaults to 0.
-        
+
         Returns:
             np.ndarray: Array of shape (bits, height, width).
         """
@@ -346,10 +342,10 @@ class MerlinDataset(object):
     def _load_codebook(self, file_name):
         """
         Load a Codebook from CSV, dropping any unwanted columns.
-        
+
         Args:
             file_name (str): Path to the codebook CSV with columns ['name', ...].
-        
+
         Returns:
             Codebook: Parsed codebook instance.
         """
@@ -360,4 +356,3 @@ class MerlinDataset(object):
         df = df.set_index("name")
 
         return Codebook(df)
-
