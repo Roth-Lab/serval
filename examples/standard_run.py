@@ -344,29 +344,32 @@ def load_merlin_fit_images(imgs, merlin_results_dir):
     return fit_imgs
 
 
-def execute_with_ray(config, default_cpus=16, default_mem=120):
-    # Generate a timestamp
-    timestamp = datetime.now().strftime("%S%H%M%S")
+def execute_with_ray(config, default_cpus=4, default_mem=2):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # temporary directory path
-    temp_dir = os.environ.get("RAY_TMPDIR", "/tmp/ry")
-    object_spilling_dir = os.path.normpath(os.path.join("./obj_spill", timestamp, "rj"))
+    # Use local Windows directories for Ray
+    ray_root = pathlib.Path.home() / "ray_work"
 
-    os.makedirs(object_spilling_dir, exist_ok=True)
+    temp_dir = ray_root / "tmp"
 
-    # Request 8 cores and 128GB of memory
+    # Create directories if they do not exist
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    object_spilling_dir.mkdir(parents=True, exist_ok=True)
+
     ray.init(
         num_cpus=default_cpus,
-        object_store_memory= default_mem * 10**9,
-        _temp_dir=temp_dir,  # General temp directory
-        object_spilling_directory=object_spilling_dir,
+        object_store_memory=int(default_mem * 10**9),
+        _temp_dir=str(temp_dir),
+        object_spilling_directory=str(object_spilling_dir),
     )
 
     enable_dask_on_ray()
 
-    main(config)
+    try:
+        main(config)
+    finally:
+        ray.shutdown()
 
-    ray.shutdown()
 
 
 if __name__ == "__main__":
