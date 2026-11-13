@@ -83,33 +83,45 @@ def main(config):
     # Load images for experiment
     bead_imgs, spot_imgs = load_dataset_imgs(dataset)
 
-    # Load the fiducial transforms
-    #fiducial_transforms = load_fiducial_transforms(bead_imgs, results_dir)
-    fiducial_cache_dir = pathlib.Path(config.get("fiducial_transforms_dir", results_dir.joinpath("fiducial_transforms")))
-    fiducial_transforms = load_fiducial_transforms(bead_imgs, fiducial_cache_dir)
-
-
-    # Conditional setting of chromatic_corrector_option
-    if decoder_type == "simple":
-        chromatic_corrector_option = None
-    else:
-        chromatic_corrector_option = serval.transform.ChromaticCorrectionImageTransform(
-            dataset.data_org.bit_to_color_map,
-            min_area=5,
-            filter_outliers=filter_outliers,
-        )
-
     # Setup image transformations
-    img_transforms = [
-        serval.transform.FiducialAlignmentImageTransform(
+    img_transforms = []
+
+    # Load the fiducial transforms if apply_fiducial_alignment is True
+    # apply_alignment means both fiducial alignment and chromatic correction
+    
+    # If key is missing, defaults to True. If key is defined as True, also True.
+    apply_alignment = config.get("apply_fiducial_alignment", True)
+    
+    fiducial_transforms = None
+    chromatic_corrector_option = None     # Conditional setting of chromatic_corrector_option
+    
+    if apply_alignment:
+        fiducial_cache_dir = pathlib.Path(config.get("fiducial_transforms_dir", results_dir / "fiducial_transforms"))
+    
+        fiducial_transforms = load_fiducial_transforms(bead_imgs, fiducial_cache_dir)
+    
+        # Conditional setting of chromatic_corrector_option
+        if decoder_type != "simple":
+            chromatic_corrector_option = serval.transform.ChromaticCorrectionImageTransform(
+                    dataset.data_org.bit_to_color_map,
+                    min_area=5,
+                    filter_outliers=filter_outliers,
+                )
+
+        img_transforms.append(
+            serval.transform.FiducialAlignmentImageTransform(
             dataset.data_org.bit_to_round_map,
             fiducial_transforms,
             chromatic_corrector=chromatic_corrector_option,
-        ),
+            )
+        )
+    
+    # Basic Preprocess is mandatory, regardless of Imaging Platform, and simulated/real.
+    img_transforms.extend([
         serval.transform.HighPassImageTransform(sigma=2),
         serval.transform.DeconvoleImageTransform(filter_size=9, num_iters=10, sigma=1.2),
         serval.transform.LowPassImageTransform(sigma=1.0),
-    ]
+    ])
 
     # Load initial scaling factors
     #init_scaling_factors = load_init_scaling_factors(spot_imgs, img_transforms, results_dir)
@@ -351,6 +363,7 @@ def execute_with_ray(config, default_cpus=4, default_mem=2):
     ray_root = pathlib.Path.home() / "ray_work"
 
     temp_dir = ray_root / "tmp"
+    object_spilling_dir = ray_root / "spill" / timestamp
 
     # Create directories if they do not exist
     temp_dir.mkdir(parents=True, exist_ok=True)
