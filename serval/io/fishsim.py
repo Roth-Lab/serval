@@ -26,7 +26,13 @@ class FishsimDataOrganisation(object):
 
         self._init_img_paths()
         
-    
+    @property
+    def fovs(self):
+        """
+        list of int: Sorted list of available field-of-view indices.
+        """
+        return sorted(self._img_paths.keys())
+        
     def _init_img_paths(self):
         # We are defining fov as a key that can be loaded from RegExpr (re) search results
         p = re.compile("_(?P<fov>\d+)\.tiff?$")
