@@ -351,7 +351,7 @@ class MerlinDataset(object):
         """
         df = pd.read_csv(file_name)
 
-        df = df.drop("id", axis=1)
+        df = df.drop("id", axis=1, errors="ignore")
 
         df = df.set_index("name")
 
