@@ -40,8 +40,10 @@ def main(config):
     decoder_type = config["decoder_type"]
 
     filter_outliers = config["filter_outliers"]
-
-    cosine_penalty = config["cosine_penalty"]
+    
+    penalty_entropy = config["penalty_entropy"]
+    
+    penalty_l2 = config["penalty_l2"]
 
     # Set to true to match the exact tiles used by MERLIN for optimization
     use_merlin_opt_tiles = config["use_merlin_opt_tiles"]
@@ -82,7 +84,10 @@ def main(config):
     bead_imgs, spot_imgs = load_dataset_imgs(dataset)
 
     # Load the fiducial transforms
-    fiducial_transforms = load_fiducial_transforms(bead_imgs, results_dir)
+    #fiducial_transforms = load_fiducial_transforms(bead_imgs, results_dir)
+    fiducial_cache_dir = pathlib.Path(config.get("fiducial_transforms_dir", results_dir.joinpath("fiducial_transforms")))
+    fiducial_transforms = load_fiducial_transforms(bead_imgs, fiducial_cache_dir)
+
 
     # Conditional setting of chromatic_corrector_option
     if decoder_type == "simple":
@@ -107,7 +112,9 @@ def main(config):
     ]
 
     # Load initial scaling factors
-    init_scaling_factors = load_init_scaling_factors(spot_imgs, img_transforms, results_dir)
+    #init_scaling_factors = load_init_scaling_factors(spot_imgs, img_transforms, results_dir)
+    histogram_cache_dir = pathlib.Path(config.get("histograms_dir", results_dir.joinpath("histograms")))
+    init_scaling_factors = load_init_scaling_factors(spot_imgs, img_transforms, histogram_cache_dir)
 
     # We added this line on May 22, 2024 since this is what the original Merlin does.
     nn = NearestNeigbourPixelDecoder(
@@ -130,10 +137,13 @@ def main(config):
             decoder = CosineOptimizedPixelDecoder(
                 dataset.codebook,
                 nn,
-                fit_max_size=int(1e5),
-                fit_min_area=5,
-                init_scaling_factors=init_scaling_factors / np.mean(init_scaling_factors),
-                penalty=int(cosine_penalty),
+                max_size=int(1e5),
+                min_area=5,
+                max_area=12,
+                init_scaling_factors=np.ones_like(init_scaling_factors),
+                pre_scaling_factors=init_scaling_factors,
+                penalty_entropy=penalty_entropy,
+                penalty_l2=penalty_l2,
             )
 
         print(decoder.scaling_factors)
@@ -246,7 +256,8 @@ def load_fiducial_transforms(imgs, results_dir):
 
         np.save(out_file, fiducial_transform)
 
-    cache_dir = results_dir.joinpath("fiducial_transforms")
+    #cache_dir = results_dir.joinpath("fiducial_transforms")
+    cache_dir = pathlib.Path(results_dir)
 
     cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -280,7 +291,8 @@ def load_init_scaling_factors(imgs, img_transforms, results_dir):
 
         np.save(out_file, hist)
 
-    cache_dir = results_dir.joinpath("histograms")
+    #cache_dir = results_dir.joinpath("histograms")
+    cache_dir = pathlib.Path(results_dir)
 
     cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -332,30 +344,22 @@ def load_merlin_fit_images(imgs, merlin_results_dir):
     return fit_imgs
 
 
-def execute_with_ray(config, default_cpus=100, default_mem=250):
+def execute_with_ray(config, default_cpus=16, default_mem=120):
     # Generate a timestamp
     timestamp = datetime.now().strftime("%S%H%M%S")
 
     # temporary directory path
-    temp_dir = os.path.normpath(os.path.join("/output_dir", timestamp, "ray"))
-    object_spilling_dir = os.path.normpath(os.path.join("/output_dir", timestamp, "ray_objspill"))
+    temp_dir = os.environ.get("RAY_TMPDIR", "/tmp/ry")
+    object_spilling_dir = os.path.normpath(os.path.join("./obj_spill", timestamp, "rj"))
+
+    os.makedirs(object_spilling_dir, exist_ok=True)
 
     # Request 8 cores and 128GB of memory
     ray.init(
         num_cpus=default_cpus,
-        object_store_memory=default_mem * 10**9,
+        object_store_memory= default_mem * 10**9,
         _temp_dir=temp_dir,  # General temp directory
-        _system_config={
-            "local_fs_capacity_threshold": 1,
-            "object_spilling_config": json.dumps(
-                {
-                    "type": "filesystem",
-                    "params": {
-                        "directory_path": object_spilling_dir,  # Specific for object spilling
-                    },
-                }
-            ),
-        },
+        object_spilling_directory=object_spilling_dir,
     )
 
     enable_dask_on_ray()
