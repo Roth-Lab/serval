@@ -25,6 +25,7 @@ from serval.image import ImageStack
 from serval.pipeline import DaskDecodingPipeline
 
 import serval.io.merlin
+import serval.io.fishsim
 import serval.transform
 
 dask.config.set({"dataframe.query-planning": True})
@@ -68,7 +69,10 @@ def main(config):
 
     codebook_file = merlin_results_dir.joinpath(config["codebook_file"])
 
-    data_org_file = merlin_results_dir.joinpath(config["data_org_file"])
+    data_org_file = config.get("data_org_file")
+
+    if data_org_file is not None:
+        data_org_file = merlin_results_dir.joinpath(data_org_file)
 
     img_dir = pathlib.Path(config["img_dir"])
 
@@ -78,10 +82,13 @@ def main(config):
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # Load up the data and metadata
-    dataset = serval.io.merlin.MerlinDataset(codebook_file, data_org_file, img_dir)
+    if config.get("simulated", False):
+        dataset = serval.io.fishsim.FishsimDataset(codebook_file, img_dir)
+    else:
+        dataset = serval.io.merlin.MerlinDataset(codebook_file, data_org_file, img_dir)
 
     # Load images for experiment
-    bead_imgs, spot_imgs = load_dataset_imgs(dataset)
+    bead_imgs, spot_imgs = load_dataset_imgs(dataset, simulated=config.get("simulated", False))
 
     # Setup image transformations
     img_transforms = []
@@ -225,7 +232,7 @@ def main(config):
     )
 
 
-def load_dataset_imgs(dataset):
+def load_dataset_imgs(dataset, simulated=False):
     """Returns a pair of dictionaries for bead and spot images for the dataset.
 
     Returns
@@ -239,17 +246,26 @@ def load_dataset_imgs(dataset):
 
     def load_spot_stack(fov, z):
         return ImageStack(dataset.get_primary_image_stack(fov, z), fov=fov, z=z)
+    
+    def load_fishsim_stack(fov):
+        return ImageStack(dataset.get_primary_image_stack(fov), fov=fov, z=0)
 
     bead_imgs = {}
-
-    for fov in dataset.data_org.fovs:
-        bead_imgs[fov] = dask.delayed(load_bead_stack)(fov)
-
     spot_imgs = {}
+    
+    if simulated:
+        # FISHsim: one N-bit TIFF stack per FOV
+        for fov in dataset.data_org.fovs:
+            spot_imgs[(fov, 0)] = dask.delayed(load_fishsim_stack)(fov)
 
-    for fov in dataset.data_org.fovs:
-        for z in range(dataset.data_org.num_z_slices):
-            spot_imgs[(fov, z)] = dask.delayed(load_spot_stack)(fov, z)
+    else:
+        # MERlin: multiple imaging rounds and Z-slices
+        for fov in dataset.data_org.fovs:
+            bead_imgs[fov] = dask.delayed(load_bead_stack)(fov)
+    
+        for fov in dataset.data_org.fovs:
+            for z in range(dataset.data_org.num_z_slices):
+                spot_imgs[(fov, z)] = dask.delayed(load_spot_stack)(fov, z)
 
     return bead_imgs, spot_imgs
 
